@@ -41,28 +41,30 @@ int main(int argc, char *argv[]) {
         if ((file1 = open(argv[1], O_RDONLY, 0)) == -1) {
             error("cp: can't open %s", argv[1]);
         }
+        close(filedes[0]);  // 关闭父进程管道的读取端，否则子进程read循环时会发生阻塞
         while ((n = read(file1, buf, BUFSIZ)) > 0) {    // 读取文件file1
             if (write(filedes[1], buf, n) != n) {   // 写入管道
                 error("cp: write error on pipe");
             }
         }
+        close(filedes[1]);
         close(file1);
     } else if (pid == 0) {
         printf("This is the child process, here read from the pipe and write to a file.\n");
         if ((file2 = creat(argv[2], PERMS)) == -1) {    // 无论是否存在文件都新建一个文件
             error("cp: can't create %s, mode %03o", argv[2], PERMS);
         }
+        close(filedes[1]);  // 关闭子进程管道的写入端，否则子进程read循环时会发生阻塞
         // 阻塞直到父进程写入管道
         while ((n = read(filedes[0], buf, BUFSIZ)) > 0) {   // 从管道读取
             if (write(file2, buf, n) != n) {    // 写入file2
                 error("cp: write error on file %s", argv[2]);
             }
         }
+        close(filedes[0]);
         close(file2);
     }
 
     waitpid(0, NULL, 0);    // 等待子进程结束
-    close(filedes[0]);
-    close(filedes[1]);
     return 0;
 }
